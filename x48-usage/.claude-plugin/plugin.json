@@ -1,0 +1,16 @@
+{
+  "name": "x48-usage",
+  "version": "0.1.0",
+  "description": "Saves Claude Code's 5-hour and weekly limits, context fill and session cost for the 48X AI Usage app.",
+  "author": {
+    "name": "48X",
+    "url": "https://github.com/48X-Dev/claude-plugins"
+  },
+  "userConfig": {
+    "dataDir": {
+      "type": "string",
+      "title": "48X AI Usage data folder (optional)",
+      "description": "Leave empty to use the app's own folder. Set it only when the 48X AI Usage app keeps its data somewhere else: an absolute path, whose sessions folder is the only place the mod writes."
+    }
+  }
+}

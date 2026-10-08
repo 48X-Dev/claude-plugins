@@ -1,0 +1,15 @@
+{
+  "name": "48x",
+  "description": "Claude Code plugins from 48X, including the mod the 48X AI Usage app reads its limits from.",
+  "owner": {
+    "name": "48X",
+    "url": "https://github.com/48X-Dev/claude-plugins"
+  },
+  "plugins": [
+    {
+      "name": "x48-usage",
+      "source": "./x48-usage",
+      "description": "Saves Claude Code's 5-hour and weekly limits, context fill and session cost for the 48X AI Usage app."
+    }
+  ]
+}
