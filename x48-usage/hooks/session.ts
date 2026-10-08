@@ -225,25 +225,18 @@ export type DataDir = {
   file: (name: string) => string
 }
 
-/** Absolute, local, no empty, . or .. part. Returns the reason otherwise. */
-export function parseDataDir(option: unknown): DataDir | string {
-  if (option === undefined || option === '') {
-    return 'no dataDir option is set (the 48X AI Usage app sets it when it installs the mod)'
-  }
-  if (typeof option !== 'string') return 'the dataDir option is not a path'
-  if (/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/.test(option)) {
-    return 'the dataDir option holds a control character'
-  }
-  const isWindows = /^[A-Za-z]:[\\/]/.test(option)
-  if (!isWindows && !/^\/(?!\/)/.test(option)) return 'the dataDir option must be an absolute local path'
-  let end = option.length
-  while (end > 0 && (option[end - 1] === '/' || option[end - 1] === '\\')) end--
-  const dir = option.slice(0, end)
+/** A folder path the mod will use: absolute, local, no control character, no empty, . or .. part. */
+export function parseFolder(path: unknown): DataDir | undefined {
+  if (typeof path !== 'string') return undefined
+  if (/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/.test(path)) return undefined
+  const isWindows = /^[A-Za-z]:[\\/]/.test(path)
+  if (!isWindows && !/^\/(?!\/)/.test(path)) return undefined
+  let end = path.length
+  while (end > 0 && (path[end - 1] === '/' || path[end - 1] === '\\')) end--
+  const dir = path.slice(0, end)
   const parts = dir.split(/[\\/]/)
-  if (parts.length < 2 || parts.slice(1).some(part => part === '' || part === '.' || part === '..')) {
-    return 'the dataDir option must name a folder below the root, with no empty, "." or ".." parts'
-  }
-  const sep = isWindows && option.includes('\\') ? '\\' : '/'
+  if (parts.length < 2 || parts.slice(1).some(part => part === '' || part === '.' || part === '..')) return undefined
+  const sep = isWindows && path.includes('\\') ? '\\' : '/'
   const sessions = `${dir}${sep}${SESSIONS_DIR}`
   return { dir, sessions, isWindows, file: name => `${sessions}${sep}${name}` }
 }
@@ -252,15 +245,13 @@ export type Os = 'macos' | 'windows' | 'linux'
 export type Env = Partial<Record<'HOME' | 'USERPROFILE' | 'LOCALAPPDATA' | 'XDG_DATA_HOME', string>>
 
 function under(base: string | undefined, isWindows: boolean, parts: string[]): DataDir | undefined {
-  if (!base) return undefined
-  const parent = parseDataDir(base)
-  if (typeof parent === 'string' || parent.isWindows !== isWindows) return undefined
-  const data = parseDataDir([parent.dir, ...parts].join(isWindows ? '\\' : '/'))
-  return typeof data === 'string' ? undefined : data
+  const parent = parseFolder(base)
+  if (parent?.isWindows !== isWindows) return undefined
+  return parseFolder([parent.dir, ...parts].join(isWindows ? '\\' : '/'))
 }
 
 /**
- * Core's paths::data_dir() on `os`, from the environment alone, each value held to dataDir's rules.
+ * Core's paths::data_dir() on `os`, from the environment alone, each value held to parseFolder's rules.
  * Undefined where core would ask the OS instead, or a value isn't a safe absolute path.
  */
 export function defaultDataDir(os: Os, env: Env): DataDir | undefined {

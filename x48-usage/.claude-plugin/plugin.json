@@ -5,12 +5,5 @@
   "author": {
     "name": "48X",
     "url": "https://github.com/48X-Dev/claude-plugins"
-  },
-  "userConfig": {
-    "dataDir": {
-      "type": "string",
-      "title": "48X AI Usage data folder (optional)",
-      "description": "Leave empty to use the app's own folder. Set it only when the 48X AI Usage app keeps its data somewhere else: an absolute path, whose sessions folder is the only place the mod writes."
-    }
   }
 }

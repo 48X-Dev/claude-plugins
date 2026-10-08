@@ -11,7 +11,6 @@ import {
   isSessionId,
   isWritableFile,
   merge,
-  parseDataDir,
   previousFile,
   reading,
   shouldWrite,
@@ -22,9 +21,6 @@ const COMMAND = 'x48-usage'
 // Bounds the map if a session.end is missed.
 const MAX_TRACKED = 32
 const NO_FOLDER = "the 48X AI Usage app hasn't set up its data folder yet, so nothing is saved"
-
-/** The dataDir option when it's set, which wins outright; undefined means the app's default folder. */
-type Override = DataDir | string | undefined
 
 type Tracked = {
   account: string
@@ -87,9 +83,8 @@ async function folderProblem($: EngineInterface, data: DataDir): Promise<string 
   return undefined
 }
 
-/** The override, else the first default whose folders pass the checks. */
-async function locate($: EngineInterface, override: Override): Promise<DataDir | string> {
-  if (override !== undefined) return override
+/** The first default whose folders pass the checks. */
+async function locate($: EngineInterface): Promise<DataDir | string> {
   if (found) return found
   const env: Env = {
     HOME: await $.env.get('HOME'),
@@ -125,12 +120,12 @@ async function seed($: EngineInterface, path: string, session: Tracked, size: nu
   return text === undefined ? null : previousFile(text, session.account)
 }
 
-async function write($: EngineInterface, override: Override, session: Tracked, e: Measured | undefined) {
+async function write($: EngineInterface, session: Tracked, e: Measured | undefined) {
   const usage = e ?? (await $.session.usage())
   const now = Math.floor((await $.clock.now()) / 1000)
   const r = reading(usage, now)
   if (!hasReading(r)) return
-  const data = await locate($, override)
+  const data = await locate($)
   if (typeof data === 'string') {
     session.note = data
     return
@@ -160,12 +155,12 @@ async function write($: EngineInterface, override: Override, session: Tracked, e
 }
 
 /** With no measurement, saves what `$.session.usage()` says now. */
-async function save($: EngineInterface, override: Override, e?: Measured) {
+async function save($: EngineInterface, e?: Measured) {
   const session = await track($)
   if (!session) return
   // One write at a time per session, so an older measurement never lands after a newer one.
   session.pending = session.pending
-    .then(() => write($, override, session, e))
+    .then(() => write($, session, e))
     .catch(() => {
       session.note = 'the last save failed'
     })
@@ -173,11 +168,10 @@ async function save($: EngineInterface, override: Override, e?: Measured) {
 }
 
 /** Saves once the hook has returned, so the session never waits on the disk. */
-function queue($: EngineInterface, override: Override, e?: Measured) {
-  if (typeof override === 'string') return
+function queue($: EngineInterface, e?: Measured) {
   try {
     $.clock.after(0, () => {
-      save($, override, e).catch(() => {})
+      save($, e).catch(() => {})
     })
   } catch {
     // No timer, no save; the hook still passes the event on.
@@ -185,8 +179,7 @@ function queue($: EngineInterface, override: Override, e?: Measured) {
 }
 
 // Command output already carries the plugin's name.
-async function status($: EngineInterface, override: Override): Promise<string> {
-  if (typeof override === 'string') return `nothing is saved because ${override}`
+async function status($: EngineInterface): Promise<string> {
   const id = await $.session.id()
   const session = tracked.get(id)
   if (session) {
@@ -197,21 +190,18 @@ async function status($: EngineInterface, override: Override): Promise<string> {
   return isSessionId(id) ? 'nothing measured yet' : 'this session has no usable id, so nothing is saved'
 }
 
-export const register: Register = (on, options) => {
-  const option = options.dataDir
-  const override: Override = option === undefined || option === '' ? undefined : parseDataDir(option)
-
+export const register: Register = on => {
   // Saving at start lets the app show "waiting" before the first reply.
   on('session.start', async ($, e, next) => {
     await $.command
       .register({ name: COMMAND, description: 'Show what the 48X usage mod last saved, or why it saved nothing' })
       .catch(() => undefined)
-    queue($, override)
+    queue($)
     return next(e)
   })
 
   on('session.measure', async ($, e, next) => {
-    queue($, override, e)
+    queue($, e)
     return next(e)
   })
 
@@ -220,7 +210,7 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
-  on('command.run', { command: COMMAND }, async $ => ({ text: await status($, override) })).catch(() => ({
+  on('command.run', { command: COMMAND }, async $ => ({ text: await status($) })).catch(() => ({
     text: 'could not read its own state',
   }))
 }
